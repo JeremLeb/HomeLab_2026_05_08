@@ -155,17 +155,38 @@ export function Sidebar() {
 
         {/* Footer */}
         <div className="flex items-center justify-between px-3 py-2 border-t border-border">
-          <button
-            onClick={() => setShowSettings(true)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            title="Settings"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.07 4.93A10 10 0 0 0 4.93 19.07M4.93 4.93A10 10 0 0 1 19.07 19.07" />
-              <path d="M12 2v2m0 18v2M2 12h2m18 0h2m-3.34-6.66 1.42-1.42M4.93 19.07l-1.42 1.42M19.07 19.07l1.42 1.42M4.93 4.93 3.51 3.51" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowSettings(true)}
+              className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-accent"
+              title="Settings"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.07 4.93A10 10 0 0 0 4.93 19.07M4.93 4.93A10 10 0 0 1 19.07 19.07" />
+                <path d="M12 2v2m0 18v2M2 12h2m18 0h2m-3.34-6.66 1.42-1.42M4.93 19.07l-1.42 1.42M19.07 19.07l1.42 1.42M4.93 4.93 3.51 3.51" />
+              </svg>
+            </button>
+            <button
+              onClick={() => router.push("/graph")}
+              className={`text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-accent ${
+                pathname === "/graph" ? "text-foreground bg-accent" : ""
+              }`}
+              title="Graph view"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="2.5" />
+                <circle cx="4.5" cy="5.5" r="2" />
+                <circle cx="19.5" cy="5.5" r="2" />
+                <circle cx="4.5" cy="18.5" r="2" />
+                <circle cx="19.5" cy="18.5" r="2" />
+                <line x1="12" y1="9.5" x2="6" y2="7" />
+                <line x1="12" y1="9.5" x2="18" y2="7" />
+                <line x1="12" y1="14.5" x2="6" y2="17" />
+                <line x1="12" y1="14.5" x2="18" y2="17" />
+              </svg>
+            </button>
+          </div>
           <ThemeToggle />
         </div>
       </aside>

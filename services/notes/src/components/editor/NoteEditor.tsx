@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -28,6 +29,7 @@ const lowlight = createLowlight(common);
 type Props = { note: NoteDetail };
 
 export function NoteEditor({ note }: Props) {
+  const router = useRouter();
   const [title, setTitle] = useState(note.title);
   const [showAiPanel, setShowAiPanel] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -106,13 +108,32 @@ export function NoteEditor({ note }: Props) {
     <div className="flex h-full">
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-8 py-12">
-          {/* Title */}
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Untitled"
-            className="w-full text-4xl font-bold bg-transparent outline-none placeholder:text-muted-foreground/40 mb-6 border-none"
-          />
+          {/* Title row */}
+          <div className="relative">
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Untitled"
+              className="w-full text-4xl font-bold bg-transparent outline-none placeholder:text-muted-foreground/40 mb-6 border-none pr-10"
+            />
+            <button
+              onClick={() => router.push(`/graph?note=${note.id}`)}
+              title="Open in graph view"
+              className="absolute top-1 right-0 text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded hover:bg-accent"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="2.5" />
+                <circle cx="4.5" cy="5.5" r="2" />
+                <circle cx="19.5" cy="5.5" r="2" />
+                <circle cx="4.5" cy="18.5" r="2" />
+                <circle cx="19.5" cy="18.5" r="2" />
+                <line x1="12" y1="9.5" x2="6" y2="7" />
+                <line x1="12" y1="9.5" x2="18" y2="7" />
+                <line x1="12" y1="14.5" x2="6" y2="17" />
+                <line x1="12" y1="14.5" x2="18" y2="17" />
+              </svg>
+            </button>
+          </div>
 
           {/* Editor toolbar & content */}
           {editor && (
