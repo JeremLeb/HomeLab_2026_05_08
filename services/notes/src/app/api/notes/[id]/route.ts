@@ -17,6 +17,9 @@ export async function PATCH(req: Request, { params }: Params) {
       title?: string;
       content?: string;
       keyPoints?: string[];
+      tags?: string[];
+      isTemplate?: boolean;
+      status?: string;
       parentId?: string | null;
       position?: number;
     };

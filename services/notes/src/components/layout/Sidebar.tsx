@@ -74,6 +74,37 @@ export function Sidebar() {
     [mutate, router, pathname]
   );
 
+  // Re-parent / reorder a note via drag-drop. `pos` is relative to the target.
+  const handleReorder = useCallback(
+    async (dragId: string, targetId: string, pos: "before" | "after" | "inside") => {
+      if (!notes) return;
+      const target = notes.find((n) => n.id === targetId);
+      if (!target) return;
+
+      let parentId: string | null;
+      let index: number;
+      if (pos === "inside") {
+        parentId = targetId;
+        index = notes.filter((n) => n.parentId === targetId).length; // append
+      } else {
+        parentId = target.parentId;
+        const siblings = notes
+          .filter((n) => n.parentId === parentId && n.id !== dragId)
+          .sort((a, b) => a.position - b.position);
+        const targetIdx = siblings.findIndex((n) => n.id === targetId);
+        index = pos === "before" ? targetIdx : targetIdx + 1;
+      }
+
+      await fetch("/api/notes/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: dragId, parentId, index }),
+      });
+      await mutate();
+    },
+    [notes, mutate]
+  );
+
   const handleImport = useCallback(
     async (fileList: FileList) => {
       const files = await Promise.all(
@@ -137,9 +168,21 @@ export function Sidebar() {
               {importing ? "Importing…" : "Import"}
             </button>
             <button
+              onClick={async () => {
+                const res = await fetch("/api/daily");
+                const { id } = (await res.json()) as { id: string };
+                await mutate();
+                router.push(`/notes/${id}`);
+              }}
+              className="text-xs px-2 py-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              title="Open today's daily note"
+            >
+              Today
+            </button>
+            <button
               onClick={() => createNote()}
               className="text-xs px-2 py-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-              title="New page"
+              title="New page (⌘K for command palette)"
             >
               + New
             </button>
@@ -202,6 +245,7 @@ export function Sidebar() {
               onNavigate={(id) => router.push(`/notes/${id}`)}
               onCreate={createNote}
               onDelete={deleteNote}
+              onReorder={handleReorder}
             />
           ))}
         </div>

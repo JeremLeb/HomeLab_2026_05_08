@@ -222,6 +222,35 @@ export function updateNote(
   return getNoteById(id);
 }
 
+// Move a note under a new parent and place it at `index` among its siblings,
+// renumbering all siblings so positions stay contiguous. Guards against
+// dropping a note into one of its own descendants.
+export function reorderNote(id: string, newParentId: string | null, index: number): void {
+  const db = getDb();
+  // Prevent cycles: walk up from newParentId; if we hit `id`, abort.
+  let ancestor: string | null = newParentId;
+  while (ancestor) {
+    if (ancestor === id) return;
+    const row = db.prepare("SELECT parent_id FROM notes WHERE id = ?").get(ancestor) as
+      | { parent_id: string | null }
+      | undefined;
+    ancestor = row?.parent_id ?? null;
+  }
+
+  const tx = db.transaction(() => {
+    db.prepare("UPDATE notes SET parent_id = ? WHERE id = ?").run(newParentId, id);
+    const siblings = db
+      .prepare("SELECT id FROM notes WHERE parent_id IS ? ORDER BY position ASC, created_at ASC")
+      .all(newParentId) as { id: string }[];
+    const ordered = siblings.map((s) => s.id).filter((sid) => sid !== id);
+    const clamped = Math.max(0, Math.min(index, ordered.length));
+    ordered.splice(clamped, 0, id);
+    const upd = db.prepare("UPDATE notes SET position = ? WHERE id = ?");
+    ordered.forEach((sid, i) => upd.run(i, sid));
+  });
+  tx();
+}
+
 export function deleteNote(id: string): void {
   const db = getDb();
   db.prepare("DELETE FROM notes_fts WHERE id = ?").run(id);
