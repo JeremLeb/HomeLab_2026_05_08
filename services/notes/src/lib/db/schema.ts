@@ -68,5 +68,23 @@ function initSchema(db: Database.Database) {
     );
 
     INSERT INTO settings(id) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM settings WHERE id = 1);
+
+    CREATE TABLE IF NOT EXISTS recordings (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+      filename TEXT NOT NULL,
+      duration_seconds REAL NOT NULL DEFAULT 0,
+      transcript TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_recordings_note ON recordings(note_id);
   `);
+
+  // Guarded migrations for columns added after initial deploy
+  const settingsCols = db.prepare("PRAGMA table_info(settings)").all() as { name: string }[];
+  const settingsColNames = settingsCols.map((c) => c.name);
+  if (!settingsColNames.includes("whisper_url")) {
+    db.exec("ALTER TABLE settings ADD COLUMN whisper_url TEXT NOT NULL DEFAULT ''");
+  }
 }

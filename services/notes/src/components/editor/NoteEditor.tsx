@@ -23,6 +23,8 @@ import { BlockMenu } from "./BlockMenu";
 import { EditorContextMenu } from "./EditorContextMenu";
 import { BacklinkPanel } from "./BacklinkPanel";
 import { AiPanel } from "./AiPanel";
+import { MeetingRecorder } from "./MeetingRecorder";
+import { RecordingsPanel } from "./RecordingsPanel";
 import { WikiLinkExtension } from "./WikiLinkExtension";
 
 const lowlight = createLowlight(common);
@@ -159,6 +161,15 @@ export function NoteEditor({ note }: Props) {
               >
                 <span className="text-base leading-none">✦</span>
               </button>
+              <MeetingRecorder
+                noteId={note.id}
+                onInsertHtml={(html) => {
+                  if (!editor) return;
+                  editor.commands.insertContent(html);
+                  save({ content: JSON.stringify(editor.getJSON()) });
+                  triggerAnalyze();
+                }}
+              />
               <button
                 onClick={() => router.push(`/graph?note=${note.id}`)}
                 title="Open in graph view"
@@ -191,6 +202,9 @@ export function NoteEditor({ note }: Props) {
 
           {/* Connections panel */}
           <BacklinkPanel noteId={note.id} />
+
+          {/* Recordings panel */}
+          <RecordingsPanel noteId={note.id} />
         </div>
       </div>
 

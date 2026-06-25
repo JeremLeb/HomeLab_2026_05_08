@@ -18,6 +18,7 @@ export function SettingsModal({ onClose }: Props) {
   const [anthropicKey, setAnthropicKey] = useState("");
   const [anthropicModel, setAnthropicModel] = useState("claude-haiku-4-5-20251001");
   const [theme, setTheme] = useState("dark");
+  const [whisperUrl, setWhisperUrl] = useState("");
 
   useEffect(() => {
     fetch("/api/settings")
@@ -30,6 +31,7 @@ export function SettingsModal({ onClose }: Props) {
         setOpenaiModel(s.openaiModel);
         setAnthropicModel(s.anthropicModel);
         setTheme(s.theme);
+        setWhisperUrl(s.whisperUrl || "");
       });
   }, []);
 
@@ -42,6 +44,7 @@ export function SettingsModal({ onClose }: Props) {
       openaiModel,
       anthropicModel,
       theme,
+      whisperUrl,
     };
     if (openaiKey) body.openaiKey = openaiKey;
     if (anthropicKey) body.anthropicKey = anthropicKey;
@@ -179,6 +182,21 @@ export function SettingsModal({ onClose }: Props) {
                 </div>
               </div>
             )}
+
+            {/* Whisper URL */}
+            <div>
+              <label className="text-sm font-medium mb-1 block">Whisper Server URL</label>
+              <p className="text-xs text-muted-foreground mb-2">
+                For meeting transcription. Leave blank if not using recording.
+                Example: <code className="font-mono">http://localhost:9000</code>
+              </p>
+              <input
+                value={whisperUrl}
+                onChange={(e) => setWhisperUrl(e.target.value)}
+                placeholder="http://localhost:9000"
+                className="w-full text-sm bg-muted/50 border border-border rounded-md px-3 py-2 outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
 
             {/* Theme */}
             <div>

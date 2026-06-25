@@ -42,4 +42,5 @@ export type SettingsPublic = {
   anthropicModel: string;
   linkThreshold: number;
   theme: string;
+  whisperUrl: string;
 };

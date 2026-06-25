@@ -31,6 +31,16 @@ export type Settings = {
   anthropicModel: string;
   linkThreshold: number;
   theme: string;
+  whisperUrl: string;
+};
+
+export type Recording = {
+  id: string;
+  noteId: string;
+  filename: string;
+  durationSeconds: number;
+  transcript: string;
+  createdAt: string;
 };
 
 function rowToNote(row: Record<string, unknown>): Note {
@@ -57,6 +67,18 @@ function rowToSettings(row: Record<string, unknown>): Settings {
     anthropicModel: row.anthropic_model as string,
     linkThreshold: row.link_threshold as number,
     theme: row.theme as string,
+    whisperUrl: (row.whisper_url as string) || "",
+  };
+}
+
+function rowToRecording(row: Record<string, unknown>): Recording {
+  return {
+    id: row.id as string,
+    noteId: row.note_id as string,
+    filename: row.filename as string,
+    durationSeconds: row.duration_seconds as number,
+    transcript: row.transcript as string,
+    createdAt: row.created_at as string,
   };
 }
 
@@ -285,6 +307,10 @@ export function updateSettings(data: Partial<Settings>): Settings {
     fields.push("theme = ?");
     values.push(data.theme);
   }
+  if (data.whisperUrl !== undefined) {
+    fields.push("whisper_url = ?");
+    values.push(data.whisperUrl);
+  }
 
   if (fields.length > 0) {
     db.prepare(`UPDATE settings SET ${fields.join(", ")} WHERE id = 1`).run(
@@ -364,4 +390,37 @@ export function getAllNotesKeyPoints(): {
     title: r.title,
     keyPoints: JSON.parse(r.key_points || "[]"),
   }));
+}
+
+// ── Recordings ───────────────────────────────────────────────────────────────
+
+export function createRecording(data: {
+  noteId: string;
+  filename: string;
+  durationSeconds: number;
+  transcript: string;
+}): Recording {
+  const db = getDb();
+  const id = randomUUID();
+  db.prepare(
+    `INSERT INTO recordings (id, note_id, filename, duration_seconds, transcript)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(id, data.noteId, data.filename, data.durationSeconds, data.transcript);
+  return db.prepare("SELECT * FROM recordings WHERE id = ?").get(id) as Recording;
+}
+
+export function listRecordingsForNote(noteId: string): Recording[] {
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT * FROM recordings WHERE note_id = ? ORDER BY created_at DESC")
+    .all(noteId) as Record<string, unknown>[];
+  return rows.map(rowToRecording);
+}
+
+export function getRecording(id: string): Recording | null {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT * FROM recordings WHERE id = ?")
+    .get(id) as Record<string, unknown> | null;
+  return row ? rowToRecording(row) : null;
 }

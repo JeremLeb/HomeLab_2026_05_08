@@ -13,6 +13,7 @@ function toPublic(s: ReturnType<typeof getSettings>): SettingsPublic {
     anthropicModel: s.anthropicModel,
     linkThreshold: s.linkThreshold,
     theme: s.theme,
+    whisperUrl: s.whisperUrl,
   };
 }
 
