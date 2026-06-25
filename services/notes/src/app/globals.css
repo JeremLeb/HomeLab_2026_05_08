@@ -138,6 +138,83 @@
 .prose-preview code { font-size: 0.85em; }
 .prose-preview a { color: hsl(221 83% 53%); text-decoration: underline; }
 
+/* Images in editor */
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 0.5rem 0;
+}
+.ProseMirror img.ProseMirror-selectednode { outline: 2px solid hsl(221 83% 53%); }
+
+/* File attachment chip */
+.file-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  background: hsl(var(--muted) / 0.4);
+  text-decoration: none;
+  color: inherit;
+  margin: 0.25rem 0;
+  max-width: 100%;
+  cursor: pointer;
+}
+.file-attachment:hover { background: hsl(var(--accent)); }
+.file-attachment-name { font-weight: 500; font-size: 0.875rem; }
+.file-attachment-size { font-size: 0.75rem; color: hsl(var(--muted-foreground)); }
+
+/* Math (KaTeX) */
+.math-node { cursor: pointer; }
+.math-inline { display: inline-block; padding: 0 0.1rem; }
+.math-block { display: block; text-align: center; margin: 0.75rem 0; }
+.math-node:hover { background: hsl(var(--accent) / 0.5); border-radius: 0.25rem; }
+.math-error { color: hsl(var(--destructive)); }
+.math-input {
+  font-family: ui-monospace, monospace;
+  font-size: 0.875rem;
+  background: hsl(var(--muted));
+  border: 1px solid hsl(221 83% 53%);
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.35rem;
+  outline: none;
+  min-width: 8rem;
+}
+
+/* Mermaid */
+.mermaid-node { margin: 0.75rem 0; }
+.mermaid-render {
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  display: flex;
+  justify-content: center;
+}
+.mermaid-render:hover { border-color: hsl(var(--border)); background: hsl(var(--muted) / 0.3); }
+.mermaid-textarea {
+  width: 100%;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  background: hsl(var(--muted));
+  border: 1px solid hsl(221 83% 53%);
+  border-radius: 0.375rem;
+  padding: 0.5rem;
+  outline: none;
+  resize: vertical;
+}
+.mermaid-hint { font-size: 0.7rem; color: hsl(var(--muted-foreground)); margin-top: 0.25rem; }
+.mermaid-error {
+  color: hsl(var(--destructive));
+  font-size: 0.8rem;
+  background: hsl(var(--muted));
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  white-space: pre-wrap;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }

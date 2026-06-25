@@ -61,6 +61,32 @@ const BLOCKS: BlockItem[] = [
     description: "Horizontal rule",
     action: (e) => e.chain().focus().setHorizontalRule().run(),
   },
+  {
+    label: "Math Block",
+    description: "LaTeX equation ($$…$$)",
+    action: (e) => e.chain().focus().setBlockMath("e = mc^2").run(),
+  },
+  {
+    label: "Diagram",
+    description: "Mermaid flowchart / diagram",
+    action: (e) => e.chain().focus().setMermaid("graph TD\n  A[Start] --> B[End]").run(),
+  },
+  {
+    label: "Image / File",
+    description: "Upload an image or attach a file",
+    action: (e) => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        const { uploadFile, insertUploadedFile } = await import("@/lib/upload");
+        const r = await uploadFile(file);
+        if (r) insertUploadedFile(e, r);
+      };
+      input.click();
+    },
+  },
 ];
 
 type Props = { editor: Editor };

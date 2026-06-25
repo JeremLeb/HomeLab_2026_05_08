@@ -16,6 +16,7 @@ import {
   TableHeader,
 } from "@tiptap/extension-table";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import Image from "@tiptap/extension-image";
 import { common, createLowlight } from "lowlight";
 import type { NoteDetail } from "@/types";
 import { EditorToolbar } from "./EditorToolbar";
@@ -26,6 +27,10 @@ import { AiPanel } from "./AiPanel";
 import { MeetingRecorder } from "./MeetingRecorder";
 import { RecordingsPanel } from "./RecordingsPanel";
 import { WikiLinkExtension } from "./WikiLinkExtension";
+import { FileAttachmentExtension } from "./FileAttachmentExtension";
+import { InlineMath, BlockMath } from "./MathExtension";
+import { MermaidExtension } from "./MermaidExtension";
+import { uploadFile, insertUploadedFile } from "@/lib/upload";
 
 const lowlight = createLowlight(common);
 
@@ -37,6 +42,7 @@ export function NoteEditor({ note }: Props) {
   const [showAiPanel, setShowAiPanel] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const analyzeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const editorRef = useRef<ReturnType<typeof useEditor> | null>(null);
 
   const save = useCallback(
     async (data: { title?: string; content?: string }) => {
@@ -88,7 +94,12 @@ export function NoteEditor({ note }: Props) {
       TableCell,
       TableHeader,
       CodeBlockLowlight.configure({ lowlight }),
+      Image.configure({ inline: false, allowBase64: false }),
       WikiLinkExtension,
+      FileAttachmentExtension,
+      InlineMath,
+      BlockMath,
+      MermaidExtension,
     ],
     content: (() => {
       try {
@@ -106,6 +117,30 @@ export function NoteEditor({ note }: Props) {
     },
     editorProps: {
       attributes: { class: "prose-editor" },
+      handlePaste: (_view, event) => {
+        const files = Array.from(event.clipboardData?.files ?? []);
+        if (files.length === 0) return false;
+        event.preventDefault();
+        (async () => {
+          for (const file of files) {
+            const r = await uploadFile(file, note.id);
+            if (r && editorRef.current) insertUploadedFile(editorRef.current, r);
+          }
+        })();
+        return true;
+      },
+      handleDrop: (_view, event) => {
+        const files = Array.from((event as DragEvent).dataTransfer?.files ?? []);
+        if (files.length === 0) return false;
+        event.preventDefault();
+        (async () => {
+          for (const file of files) {
+            const r = await uploadFile(file, note.id);
+            if (r && editorRef.current) insertUploadedFile(editorRef.current, r);
+          }
+        })();
+        return true;
+      },
       handleClick: (_view, _pos, event) => {
         const target = event.target as HTMLElement | null;
         const el = target?.closest?.("[data-wiki-link]") as HTMLElement | null;
@@ -122,6 +157,8 @@ export function NoteEditor({ note }: Props) {
     },
     immediatelyRender: false,
   });
+
+  editorRef.current = editor;
 
   // Title autosave
   useEffect(() => {
