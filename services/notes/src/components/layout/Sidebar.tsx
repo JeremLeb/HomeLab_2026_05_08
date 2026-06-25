@@ -6,6 +6,7 @@ import useSWR from "swr";
 import type { NoteListItem, SearchResult } from "@/types";
 import { SidebarPageItem } from "./SidebarPageItem";
 import { ThemeToggle } from "./ThemeToggle";
+import { TemplateMenu } from "./TemplateMenu";
 import { SettingsModal } from "@/components/settings/SettingsModal";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -186,6 +187,18 @@ export function Sidebar() {
             >
               + New
             </button>
+            <TemplateMenu
+              onCreate={async (templateId) => {
+                const res = await fetch("/api/templates", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ templateId }),
+                });
+                const { id } = (await res.json()) as { id: string };
+                await mutate();
+                router.push(`/notes/${id}`);
+              }}
+            />
           </div>
         </div>
         <input

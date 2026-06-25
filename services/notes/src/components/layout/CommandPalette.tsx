@@ -49,6 +49,7 @@ export function CommandPalette() {
     { id: "graph", label: "Open graph view", hint: "Visualize", run: () => { router.push("/graph"); close(); } },
     { id: "board", label: "Open board (kanban)", hint: "Status", run: () => { router.push("/board"); close(); } },
     { id: "ask", label: "Ask my notes (AI)", hint: "RAG", run: () => { router.push("/ask"); close(); } },
+    { id: "export", label: "Export all notes (zip)", hint: "Download", run: () => { window.open("/api/export/all", "_blank"); close(); } },
   ];
 
   // Toggle on Cmd/Ctrl+K

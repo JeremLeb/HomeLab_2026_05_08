@@ -26,6 +26,7 @@ import { BacklinkPanel } from "./BacklinkPanel";
 import { AiPanel } from "./AiPanel";
 import { MeetingRecorder } from "./MeetingRecorder";
 import { RecordingsPanel } from "./RecordingsPanel";
+import { NoteMenu } from "./NoteMenu";
 import { WikiLinkExtension } from "./WikiLinkExtension";
 import { FileAttachmentExtension } from "./FileAttachmentExtension";
 import { InlineMath, BlockMath } from "./MathExtension";
@@ -186,7 +187,7 @@ export function NoteEditor({ note }: Props) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Untitled"
-              className="w-full text-4xl font-bold bg-transparent outline-none placeholder:text-muted-foreground/40 mb-6 border-none pr-20"
+              className="w-full text-4xl font-bold bg-transparent outline-none placeholder:text-muted-foreground/40 mb-6 border-none pr-32"
             />
             <div className="absolute top-1 right-0 flex items-center gap-1">
               <button
@@ -224,6 +225,13 @@ export function NoteEditor({ note }: Props) {
                   <line x1="12" y1="14.5" x2="18" y2="17" />
                 </svg>
               </button>
+              <NoteMenu
+                noteId={note.id}
+                getDoc={() => ({
+                  title,
+                  content: editor ? JSON.stringify(editor.getJSON()) : note.content,
+                })}
+              />
             </div>
           </div>
 
