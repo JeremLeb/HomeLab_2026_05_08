@@ -70,6 +70,7 @@ export function BlockMenu({ editor }: Props) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const filtered = BLOCKS.filter((b) =>
     b.label.toLowerCase().includes(query.toLowerCase())
@@ -99,22 +100,36 @@ export function BlockMenu({ editor }: Props) {
   useEffect(() => {
     const onKeydown = (e: KeyboardEvent) => {
       if (!visible) return;
+      // Use capture phase + stopPropagation so these keys drive the menu
+      // instead of moving the editor cursor / inserting newlines.
       if (e.key === "ArrowDown") {
         e.preventDefault();
+        e.stopPropagation();
         setSelected((v) => Math.min(v + 1, filtered.length - 1));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
+        e.stopPropagation();
         setSelected((v) => Math.max(v - 1, 0));
       } else if (e.key === "Enter") {
         e.preventDefault();
+        e.stopPropagation();
         if (filtered[selected]) apply(filtered[selected]);
       } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
         close();
       }
     };
-    window.addEventListener("keydown", onKeydown);
-    return () => window.removeEventListener("keydown", onKeydown);
+    // capture: true → runs before ProseMirror's own keydown handler on the editor
+    window.addEventListener("keydown", onKeydown, true);
+    return () => window.removeEventListener("keydown", onKeydown, true);
   }, [visible, filtered, selected, apply, close]);
+
+  // Keep the highlighted item scrolled into view within the menu
+  useEffect(() => {
+    if (!visible) return;
+    itemRefs.current[selected]?.scrollIntoView({ block: "nearest" });
+  }, [selected, visible]);
 
   // Watch for "/" at start of a paragraph
   useEffect(() => {
@@ -160,6 +175,9 @@ export function BlockMenu({ editor }: Props) {
       {filtered.map((item, i) => (
         <button
           key={item.label}
+          ref={(el) => {
+            itemRefs.current[i] = el;
+          }}
           className={`w-full text-left px-3 py-2 text-sm flex flex-col gap-0.5 transition-colors ${
             i === selected ? "bg-accent" : "hover:bg-accent/50"
           }`}

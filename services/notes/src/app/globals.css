@@ -119,11 +119,12 @@
 
 /* Wiki link */
 .wiki-link {
-  color: hsl(217 91% 60%);
+  color: hsl(221 83% 53%);
   text-decoration: underline;
+  text-underline-offset: 2px;
   cursor: pointer;
 }
-.wiki-link:hover { color: hsl(217 91% 70%); }
+.wiki-link:hover { color: hsl(221 83% 45%); }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }

@@ -54,17 +54,32 @@ export async function POST(_: Request, { params }: Params) {
     if (keyPoints.length > 0) {
       updateNote(id, { keyPoints });
 
-      // Auto-link: compute similarity vs all other notes
+      // Auto-link: compute similarity vs all other notes.
+      // Stricter rules to avoid spurious links (e.g. a near-empty note sharing
+      // one or two generic concepts with a full note):
+      //   - both notes must have at least MIN_KEYPOINTS concepts
+      //   - they must share at least MIN_SHARED concepts
+      //   - Jaccard score must clear the configured threshold
+      const MIN_KEYPOINTS = 3;
+      const MIN_SHARED = 2;
+
       const settings = getSettings();
       const threshold = settings.linkThreshold;
       const allNotes = getAllNotesKeyPoints().filter((n) => n.id !== id);
 
       deleteNoteLinksFrom(id);
 
-      for (const other of allNotes) {
-        const score = jaccardSimilarity(keyPoints, other.keyPoints);
-        if (score >= threshold) {
+      // Skip linking entirely for sparse notes — they produce noisy matches.
+      if (keyPoints.length >= MIN_KEYPOINTS) {
+        for (const other of allNotes) {
+          if (other.keyPoints.length < MIN_KEYPOINTS) continue;
+
           const matched = getIntersection(keyPoints, other.keyPoints);
+          if (matched.length < MIN_SHARED) continue;
+
+          const score = jaccardSimilarity(keyPoints, other.keyPoints);
+          if (score < threshold) continue;
+
           upsertNoteLink({
             fromId: id,
             toId: other.id,

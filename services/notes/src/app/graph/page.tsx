@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { AppShell } from "@/components/layout/AppShell";
 
 const GraphView = dynamic(
   () => import("@/components/graph/GraphView").then((m) => m.GraphView),
@@ -29,8 +30,10 @@ function GraphPageInner() {
 
 export default function GraphPage() {
   return (
-    <Suspense fallback={<GraphSkeleton />}>
-      <GraphPageInner />
-    </Suspense>
+    <AppShell>
+      <Suspense fallback={<GraphSkeleton />}>
+        <GraphPageInner />
+      </Suspense>
+    </AppShell>
   );
 }

@@ -82,9 +82,18 @@ export function getNoteById(id: string): Note | null {
   return row ? rowToNote(row) : null;
 }
 
+export function getNoteByTitle(title: string): Note | null {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT * FROM notes WHERE title = ? COLLATE NOCASE LIMIT 1")
+    .get(title) as Record<string, unknown> | null;
+  return row ? rowToNote(row) : null;
+}
+
 export function createNote(data: {
   title?: string;
   parentId?: string | null;
+  content?: string;
 }): Note {
   const db = getDb();
   const id = randomUUID();
@@ -96,9 +105,21 @@ export function createNote(data: {
       .get(data.parentId ?? null) as { m: number }
   ).m;
 
-  db.prepare(
-    `INSERT INTO notes (id, title, parent_id, position) VALUES (?, ?, ?, ?)`
-  ).run(id, data.title ?? "Untitled", data.parentId ?? null, maxPos + 1);
+  if (data.content !== undefined) {
+    db.prepare(
+      `INSERT INTO notes (id, title, parent_id, position, content) VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      id,
+      data.title ?? "Untitled",
+      data.parentId ?? null,
+      maxPos + 1,
+      data.content
+    );
+  } else {
+    db.prepare(
+      `INSERT INTO notes (id, title, parent_id, position) VALUES (?, ?, ?, ?)`
+    ).run(id, data.title ?? "Untitled", data.parentId ?? null, maxPos + 1);
+  }
 
   return getNoteById(id)!;
 }

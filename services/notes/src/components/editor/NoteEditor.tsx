@@ -20,6 +20,7 @@ import { common, createLowlight } from "lowlight";
 import type { NoteDetail } from "@/types";
 import { EditorToolbar } from "./EditorToolbar";
 import { BlockMenu } from "./BlockMenu";
+import { EditorContextMenu } from "./EditorContextMenu";
 import { BacklinkPanel } from "./BacklinkPanel";
 import { AiPanel } from "./AiPanel";
 import { WikiLinkExtension } from "./WikiLinkExtension";
@@ -53,6 +54,25 @@ export function NoteEditor({ note }: Props) {
     }, 2000);
   }, [note.id]);
 
+  // Navigate to a wiki-linked note, creating it if it doesn't exist yet.
+  const openWikiLink = useCallback(
+    async (title: string) => {
+      try {
+        const res = await fetch("/api/notes/resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        });
+        if (!res.ok) return;
+        const { id } = (await res.json()) as { id: string };
+        router.push(`/notes/${id}`);
+      } catch {
+        /* ignore */
+      }
+    },
+    [router]
+  );
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ codeBlock: false }),
@@ -84,6 +104,19 @@ export function NoteEditor({ note }: Props) {
     },
     editorProps: {
       attributes: { class: "prose-editor" },
+      handleClick: (_view, _pos, event) => {
+        const target = event.target as HTMLElement | null;
+        const el = target?.closest?.("[data-wiki-link]") as HTMLElement | null;
+        if (el) {
+          const title = el.getAttribute("data-wiki-link");
+          if (title) {
+            event.preventDefault();
+            openWikiLink(title);
+            return true;
+          }
+        }
+        return false;
+      },
     },
     immediatelyRender: false,
   });
@@ -140,6 +173,7 @@ export function NoteEditor({ note }: Props) {
             <>
               <EditorToolbar editor={editor} onAiPanel={() => setShowAiPanel((v) => !v)} />
               <BlockMenu editor={editor} />
+              <EditorContextMenu editor={editor} />
             </>
           )}
           <EditorContent editor={editor} />
