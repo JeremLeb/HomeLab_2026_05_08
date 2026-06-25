@@ -27,6 +27,7 @@ import { AiPanel } from "./AiPanel";
 import { MeetingRecorder } from "./MeetingRecorder";
 import { RecordingsPanel } from "./RecordingsPanel";
 import { NoteMenu } from "./NoteMenu";
+import { TagBar } from "./TagBar";
 import { WikiLinkExtension } from "./WikiLinkExtension";
 import { FileAttachmentExtension } from "./FileAttachmentExtension";
 import { InlineMath, BlockMath } from "./MathExtension";
@@ -234,6 +235,9 @@ export function NoteEditor({ note }: Props) {
               />
             </div>
           </div>
+
+          {/* Tags */}
+          <TagBar noteId={note.id} initialTags={note.tags ?? []} />
 
           {/* Editor toolbar & content */}
           {editor && (

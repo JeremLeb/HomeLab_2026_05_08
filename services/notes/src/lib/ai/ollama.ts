@@ -22,6 +22,17 @@ export class OllamaAdapter implements AiAdapter {
     return data.message?.content ?? "";
   }
 
+  async embed(text: string): Promise<number[]> {
+    const res = await fetch(`${this.baseUrl}/api/embeddings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: this.model, prompt: text }),
+    });
+    if (!res.ok) throw new Error(`Ollama embeddings error: ${res.status}`);
+    const data = (await res.json()) as { embedding?: number[] };
+    return data.embedding ?? [];
+  }
+
   async chat(
     messages: AiMessage[],
     onChunk: (delta: string) => void

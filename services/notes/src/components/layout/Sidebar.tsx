@@ -7,6 +7,7 @@ import type { NoteListItem, SearchResult } from "@/types";
 import { SidebarPageItem } from "./SidebarPageItem";
 import { ThemeToggle } from "./ThemeToggle";
 import { TemplateMenu } from "./TemplateMenu";
+import { VoiceQuickNote } from "./VoiceQuickNote";
 import { SettingsModal } from "@/components/settings/SettingsModal";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -296,6 +297,7 @@ export function Sidebar() {
                 <line x1="12" y1="14.5" x2="18" y2="17" />
               </svg>
             </button>
+            <VoiceQuickNote />
           </div>
           <ThemeToggle />
         </div>

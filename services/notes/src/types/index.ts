@@ -4,6 +4,8 @@ export type NoteListItem = {
   parentId: string | null;
   position: number;
   updatedAt: string;
+  tags?: string[];
+  status?: string;
   children?: NoteListItem[];
 };
 
@@ -12,6 +14,8 @@ export type NoteDetail = {
   title: string;
   content: string;
   keyPoints: string[];
+  tags: string[];
+  status?: string;
   parentId: string | null;
   position: number;
   createdAt: string;

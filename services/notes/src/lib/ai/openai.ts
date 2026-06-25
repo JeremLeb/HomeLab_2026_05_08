@@ -24,6 +24,14 @@ export class OpenAiAdapter implements AiAdapter {
     return res.choices[0]?.message?.content ?? "";
   }
 
+  async embed(text: string): Promise<number[]> {
+    const res = await this.client.embeddings.create({
+      model: "text-embedding-3-small",
+      input: text,
+    });
+    return res.data[0]?.embedding ?? [];
+  }
+
   async chat(
     messages: AiMessage[],
     onChunk: (delta: string) => void
