@@ -30,7 +30,7 @@ function MermaidView({ node, updateAttributes, editor }: NodeViewProps) {
     (async () => {
       try {
         const mermaid = (await import("mermaid")).default;
-        mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "loose" });
+        mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "strict" });
         const { svg } = await mermaid.render(`mmd-${id}`, code);
         if (!cancelled) {
           setSvg(svg);

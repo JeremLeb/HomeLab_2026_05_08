@@ -4,6 +4,8 @@ import { transcribeAudio } from "@/lib/whisper";
 
 export const dynamic = "force-dynamic";
 
+const MAX_AUDIO_SIZE = 200 * 1024 * 1024; // 200 MB
+
 // POST (multipart: audio) → transcribe and create a new note from the text.
 export async function POST(req: Request) {
   try {
@@ -15,10 +17,18 @@ export async function POST(req: Request) {
       );
     }
 
+    const contentLength = Number(req.headers.get("content-length") ?? 0);
+    if (contentLength > MAX_AUDIO_SIZE) {
+      return NextResponse.json({ error: "audio file too large (max 200MB)" }, { status: 413 });
+    }
+
     const form = await req.formData();
     const audio = form.get("audio") as File | null;
     if (!audio) {
       return NextResponse.json({ error: "audio required" }, { status: 400 });
+    }
+    if (audio.size > MAX_AUDIO_SIZE) {
+      return NextResponse.json({ error: "audio file too large (max 200MB)" }, { status: 413 });
     }
 
     const buffer = Buffer.from(await audio.arrayBuffer());

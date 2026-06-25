@@ -1,8 +1,11 @@
 import { getAiAdapter } from "@/lib/ai";
 import { getNoteById } from "@/lib/db/queries";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rateLimit";
 import type { AiMessage } from "@/lib/ai/types";
 
 export async function POST(req: Request) {
+  const ip = req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "local";
+  if (!checkRateLimit(ip)) return rateLimitResponse();
   try {
     const { messages, noteId } = (await req.json()) as {
       messages: AiMessage[];

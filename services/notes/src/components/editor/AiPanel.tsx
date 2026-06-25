@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import DOMPurify from "dompurify";
 import type { AiMessage } from "@/lib/ai/types";
+
+// Sanitize AI-generated HTML before rendering to prevent XSS.
+// Allow the same tags the AI is instructed to produce.
+const ALLOWED_TAGS = ["h1","h2","h3","p","ul","ol","li","strong","em","code","pre","blockquote","br","span","a"];
+const ALLOWED_ATTR = ["href","target","rel","class"];
+function sanitize(html: string): string {
+  return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR, FORCE_BODY: true });
+}
 
 type Props = {
   noteId: string;
@@ -288,7 +297,7 @@ export function AiPanel({ noteId, onClose, onApplyHtml }: Props) {
               </div>
               <div
                 className="p-3 text-sm prose-preview max-h-72 overflow-y-auto"
-                dangerouslySetInnerHTML={{ __html: proposedHtml }}
+                dangerouslySetInnerHTML={{ __html: sanitize(proposedHtml) }}
               />
               <div className="flex gap-2 p-3 border-t border-border">
                 <button

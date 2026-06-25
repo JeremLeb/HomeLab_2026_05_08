@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import DOMPurify from "dompurify";
 import useSWR from "swr";
 import type { NoteListItem, SearchResult } from "@/types";
 import { SidebarPageItem } from "./SidebarPageItem";
@@ -239,7 +240,9 @@ export function Sidebar() {
                   {r.snippet && (
                     <div
                       className="text-xs text-muted-foreground truncate mt-0.5"
-                      dangerouslySetInnerHTML={{ __html: r.snippet }}
+                      dangerouslySetInnerHTML={{
+                        __html: DOMPurify.sanitize(r.snippet, { ALLOWED_TAGS: ["mark"] }),
+                      }}
                     />
                   )}
                 </button>

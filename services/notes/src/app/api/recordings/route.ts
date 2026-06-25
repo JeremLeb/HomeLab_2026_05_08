@@ -16,6 +16,7 @@ export const dynamic = "force-dynamic";
 
 const DB_DIR = process.env.DB_DIR || path.join(process.cwd(), "data");
 const RECORDINGS_DIR = path.join(DB_DIR, "recordings");
+const MAX_AUDIO_SIZE = 200 * 1024 * 1024; // 200 MB
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -41,6 +42,11 @@ export async function POST(req: Request) {
       );
     }
 
+    const contentLength = Number(req.headers.get("content-length") ?? 0);
+    if (contentLength > MAX_AUDIO_SIZE) {
+      return NextResponse.json({ error: "audio file too large (max 200MB)" }, { status: 413 });
+    }
+
     const form = await req.formData();
     const audio = form.get("audio") as File | null;
     const noteId = form.get("noteId") as string | null;
@@ -50,6 +56,9 @@ export async function POST(req: Request) {
         { error: "audio and noteId required" },
         { status: 400 }
       );
+    }
+    if (audio.size > MAX_AUDIO_SIZE) {
+      return NextResponse.json({ error: "audio file too large (max 200MB)" }, { status: 413 });
     }
 
     // Validate the note exists before writing anything to disk so we don't
