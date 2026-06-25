@@ -28,6 +28,7 @@ import { MeetingRecorder } from "./MeetingRecorder";
 import { RecordingsPanel } from "./RecordingsPanel";
 import { NoteMenu } from "./NoteMenu";
 import { TagBar } from "./TagBar";
+import { VersionHistory } from "./VersionHistory";
 import { WikiLinkExtension } from "./WikiLinkExtension";
 import { FileAttachmentExtension } from "./FileAttachmentExtension";
 import { InlineMath, BlockMath } from "./MathExtension";
@@ -42,6 +43,7 @@ export function NoteEditor({ note }: Props) {
   const router = useRouter();
   const [title, setTitle] = useState(note.title);
   const [showAiPanel, setShowAiPanel] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const analyzeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<ReturnType<typeof useEditor> | null>(null);
@@ -228,6 +230,7 @@ export function NoteEditor({ note }: Props) {
               </button>
               <NoteMenu
                 noteId={note.id}
+                onShowHistory={() => setShowHistory(true)}
                 getDoc={() => ({
                   title,
                   content: editor ? JSON.stringify(editor.getJSON()) : note.content,
@@ -268,6 +271,15 @@ export function NoteEditor({ note }: Props) {
             save({ content: JSON.stringify(editor.getJSON()) });
             triggerAnalyze();
           }}
+        />
+      )}
+
+      {/* Version history */}
+      {showHistory && (
+        <VersionHistory
+          noteId={note.id}
+          onClose={() => setShowHistory(false)}
+          onRestored={() => router.refresh()}
         />
       )}
     </div>

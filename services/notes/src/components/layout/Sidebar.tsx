@@ -297,6 +297,19 @@ export function Sidebar() {
                 <line x1="12" y1="14.5" x2="18" y2="17" />
               </svg>
             </button>
+            <button
+              onClick={() => router.push("/board")}
+              className={`text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-accent ${
+                pathname === "/board" ? "text-foreground bg-accent" : ""
+              }`}
+              title="Board (kanban)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="4" width="5" height="16" rx="1" />
+                <rect x="10" y="4" width="5" height="10" rx="1" />
+                <rect x="17" y="4" width="4" height="13" rx="1" />
+              </svg>
+            </button>
             <VoiceQuickNote />
           </div>
           <ThemeToggle />

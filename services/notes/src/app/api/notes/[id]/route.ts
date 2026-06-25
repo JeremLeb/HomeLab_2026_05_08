@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getNoteById, updateNote, deleteNote } from "@/lib/db/queries";
+import { getNoteById, updateNote, deleteNote, createVersion } from "@/lib/db/queries";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -23,6 +23,13 @@ export async function PATCH(req: Request, { params }: Params) {
       parentId?: string | null;
       position?: number;
     };
+    // Snapshot the previous content before overwriting (version history).
+    // createVersion de-dupes identical consecutive snapshots and caps retention.
+    if (body.content !== undefined) {
+      const prev = getNoteById(id);
+      if (prev && prev.content) createVersion(id, prev.title, prev.content);
+    }
+
     const note = updateNote(id, body);
     if (!note)
       return NextResponse.json({ error: "Not found" }, { status: 404 });

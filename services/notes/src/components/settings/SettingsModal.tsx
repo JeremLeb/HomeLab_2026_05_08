@@ -198,6 +198,21 @@ export function SettingsModal({ onClose }: Props) {
               />
             </div>
 
+            {/* Web clipper bookmarklet */}
+            <div>
+              <label className="text-sm font-medium mb-1 block">Web Clipper</label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Drag this to your bookmarks bar, then click it on any page to clip it into a new note.
+              </p>
+              <a
+                href={`javascript:(function(){var s=window.getSelection().toString();var h=document.body.innerHTML;fetch('${typeof window !== "undefined" ? window.location.origin : ""}/api/clip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:document.title,url:location.href,html:s?undefined:h,text:s||undefined})}).then(function(r){return r.json()}).then(function(d){alert('Clipped to notes!')}).catch(function(e){alert('Clip failed: '+e)})})();`}
+                onClick={(e) => e.preventDefault()}
+                className="inline-block px-3 py-1.5 text-sm rounded-md border border-border bg-muted/50 hover:bg-accent cursor-grab"
+              >
+                📎 Clip to Notes
+              </a>
+            </div>
+
             {/* Theme */}
             <div>
               <label className="text-sm font-medium mb-2 block">Theme</label>
