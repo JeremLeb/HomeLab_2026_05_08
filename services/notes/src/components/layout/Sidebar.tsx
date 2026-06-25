@@ -41,7 +41,9 @@ export function Sidebar() {
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showSettings, setShowSettings] = useState(false);
+  const [importing, setImporting] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: notes, mutate } = useSWR<NoteListItem[]>("/api/notes", fetcher, {
     refreshInterval: 5000,
@@ -72,6 +74,36 @@ export function Sidebar() {
     [mutate, router, pathname]
   );
 
+  const handleImport = useCallback(
+    async (fileList: FileList) => {
+      const files = await Promise.all(
+        Array.from(fileList).map(
+          (f) =>
+            new Promise<{ name: string; content: string }>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () =>
+                resolve({ name: f.name, content: String(reader.result ?? "") });
+              reader.readAsText(f);
+            })
+        )
+      );
+      setImporting(true);
+      try {
+        const res = await fetch("/api/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ files }),
+        });
+        const data = (await res.json()) as { created?: { id: string }[] };
+        await mutate();
+        if (data.created?.[0]) router.push(`/notes/${data.created[0].id}`);
+      } finally {
+        setImporting(false);
+      }
+    },
+    [mutate, router]
+  );
+
   useEffect(() => {
     if (!search.trim()) {
       setSearchResults([]);
@@ -95,14 +127,35 @@ export function Sidebar() {
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-3 border-b border-border">
           <span className="text-sm font-semibold text-foreground/80">Notes</span>
-          <button
-            onClick={() => createNote()}
-            className="text-xs px-2 py-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-            title="New page"
-          >
-            + New
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className="text-xs px-2 py-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              title="Import notes (Markdown, HTML, text) from Obsidian, Notion, Bear, …"
+            >
+              {importing ? "Importing…" : "Import"}
+            </button>
+            <button
+              onClick={() => createNote()}
+              className="text-xs px-2 py-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              title="New page"
+            >
+              + New
+            </button>
+          </div>
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept=".md,.markdown,.html,.htm,.txt,.text"
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files?.length) handleImport(e.target.files);
+            e.target.value = "";
+          }}
+        />
 
         {/* Search */}
         <div className="px-3 py-2 border-b border-border">

@@ -147,25 +147,36 @@ export function NoteEditor({ note }: Props) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Untitled"
-              className="w-full text-4xl font-bold bg-transparent outline-none placeholder:text-muted-foreground/40 mb-6 border-none pr-10"
+              className="w-full text-4xl font-bold bg-transparent outline-none placeholder:text-muted-foreground/40 mb-6 border-none pr-20"
             />
-            <button
-              onClick={() => router.push(`/graph?note=${note.id}`)}
-              title="Open in graph view"
-              className="absolute top-1 right-0 text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded hover:bg-accent"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="2.5" />
-                <circle cx="4.5" cy="5.5" r="2" />
-                <circle cx="19.5" cy="5.5" r="2" />
-                <circle cx="4.5" cy="18.5" r="2" />
-                <circle cx="19.5" cy="18.5" r="2" />
-                <line x1="12" y1="9.5" x2="6" y2="7" />
-                <line x1="12" y1="9.5" x2="18" y2="7" />
-                <line x1="12" y1="14.5" x2="6" y2="17" />
-                <line x1="12" y1="14.5" x2="18" y2="17" />
-              </svg>
-            </button>
+            <div className="absolute top-1 right-0 flex items-center gap-1">
+              <button
+                onClick={() => setShowAiPanel((v) => !v)}
+                title="AI assistant — chat & edit this note"
+                className={`transition-colors p-1.5 rounded hover:bg-accent ${
+                  showAiPanel ? "text-foreground bg-accent" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span className="text-base leading-none">✦</span>
+              </button>
+              <button
+                onClick={() => router.push(`/graph?note=${note.id}`)}
+                title="Open in graph view"
+                className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded hover:bg-accent"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="2.5" />
+                  <circle cx="4.5" cy="5.5" r="2" />
+                  <circle cx="19.5" cy="5.5" r="2" />
+                  <circle cx="4.5" cy="18.5" r="2" />
+                  <circle cx="19.5" cy="18.5" r="2" />
+                  <line x1="12" y1="9.5" x2="6" y2="7" />
+                  <line x1="12" y1="9.5" x2="18" y2="7" />
+                  <line x1="12" y1="14.5" x2="6" y2="17" />
+                  <line x1="12" y1="14.5" x2="18" y2="17" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* Editor toolbar & content */}
@@ -185,7 +196,16 @@ export function NoteEditor({ note }: Props) {
 
       {/* AI Chat panel */}
       {showAiPanel && (
-        <AiPanel noteId={note.id} onClose={() => setShowAiPanel(false)} />
+        <AiPanel
+          noteId={note.id}
+          onClose={() => setShowAiPanel(false)}
+          onApplyHtml={(html) => {
+            if (!editor) return;
+            editor.commands.setContent(html, { emitUpdate: true });
+            save({ content: JSON.stringify(editor.getJSON()) });
+            triggerAnalyze();
+          }}
+        />
       )}
     </div>
   );

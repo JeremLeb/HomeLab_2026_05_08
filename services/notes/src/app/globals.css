@@ -126,6 +126,18 @@
 }
 .wiki-link:hover { color: hsl(221 83% 45%); }
 
+/* AI revision preview (constrained so headings don't blow out the panel) */
+.prose-preview h1 { font-size: 1.1rem; font-weight: 700; margin: 0.5rem 0 0.25rem; }
+.prose-preview h2 { font-size: 1rem; font-weight: 600; margin: 0.5rem 0 0.25rem; }
+.prose-preview h3 { font-size: 0.95rem; font-weight: 600; margin: 0.4rem 0 0.2rem; }
+.prose-preview p { margin: 0.35rem 0; }
+.prose-preview ul { list-style: disc; padding-left: 1.2rem; margin: 0.35rem 0; }
+.prose-preview ol { list-style: decimal; padding-left: 1.2rem; margin: 0.35rem 0; }
+.prose-preview blockquote { border-left: 2px solid hsl(var(--border)); padding-left: 0.6rem; color: hsl(var(--muted-foreground)); }
+.prose-preview pre { background: hsl(var(--muted)); padding: 0.5rem; border-radius: 0.375rem; overflow-x: auto; font-size: 0.8rem; }
+.prose-preview code { font-size: 0.85em; }
+.prose-preview a { color: hsl(221 83% 53%); text-decoration: underline; }
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
