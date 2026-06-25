@@ -7,6 +7,7 @@ import {
   getSettings,
   createRecording,
   listRecordingsForNote,
+  getNoteById,
 } from "@/lib/db/queries";
 import { transcribeAudio } from "@/lib/whisper";
 import { getAiAdapter } from "@/lib/ai";
@@ -49,6 +50,12 @@ export async function POST(req: Request) {
         { error: "audio and noteId required" },
         { status: 400 }
       );
+    }
+
+    // Validate the note exists before writing anything to disk so we don't
+    // leave orphaned audio files or hit a foreign-key constraint failure.
+    if (!getNoteById(noteId)) {
+      return NextResponse.json({ error: "Note not found" }, { status: 404 });
     }
 
     // Save audio to disk

@@ -13,7 +13,8 @@ export async function transcribeAudio(
   ) as ArrayBuffer;
   form.append("audio_file", new Blob([ab], { type: "audio/webm" }), filename);
 
-  const res = await fetch(`${whisperUrl}/asr?output=json`, {
+  const base = whisperUrl.replace(/\/+$/, "");
+  const res = await fetch(`${base}/asr?output=json`, {
     method: "POST",
     body: form,
   });
