@@ -2,10 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import DOMPurify from "dompurify";
 import useSWR from "swr";
 import type { NoteListItem, SearchResult } from "@/types";
 import { SidebarPageItem } from "./SidebarPageItem";
 import { ThemeToggle } from "./ThemeToggle";
+import { TemplateMenu } from "./TemplateMenu";
+import { VoiceQuickNote } from "./VoiceQuickNote";
 import { SettingsModal } from "@/components/settings/SettingsModal";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -41,7 +44,9 @@ export function Sidebar() {
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showSettings, setShowSettings] = useState(false);
+  const [importing, setImporting] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: notes, mutate } = useSWR<NoteListItem[]>("/api/notes", fetcher, {
     refreshInterval: 5000,
@@ -72,6 +77,67 @@ export function Sidebar() {
     [mutate, router, pathname]
   );
 
+  // Re-parent / reorder a note via drag-drop. `pos` is relative to the target.
+  const handleReorder = useCallback(
+    async (dragId: string, targetId: string, pos: "before" | "after" | "inside") => {
+      if (!notes) return;
+      const target = notes.find((n) => n.id === targetId);
+      if (!target) return;
+
+      let parentId: string | null;
+      let index: number;
+      if (pos === "inside") {
+        parentId = targetId;
+        index = notes.filter((n) => n.parentId === targetId).length; // append
+      } else {
+        parentId = target.parentId;
+        const siblings = notes
+          .filter((n) => n.parentId === parentId && n.id !== dragId)
+          .sort((a, b) => a.position - b.position);
+        const targetIdx = siblings.findIndex((n) => n.id === targetId);
+        index = pos === "before" ? targetIdx : targetIdx + 1;
+      }
+
+      await fetch("/api/notes/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: dragId, parentId, index }),
+      });
+      await mutate();
+    },
+    [notes, mutate]
+  );
+
+  const handleImport = useCallback(
+    async (fileList: FileList) => {
+      const files = await Promise.all(
+        Array.from(fileList).map(
+          (f) =>
+            new Promise<{ name: string; content: string }>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () =>
+                resolve({ name: f.name, content: String(reader.result ?? "") });
+              reader.readAsText(f);
+            })
+        )
+      );
+      setImporting(true);
+      try {
+        const res = await fetch("/api/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ files }),
+        });
+        const data = (await res.json()) as { created?: { id: string }[] };
+        await mutate();
+        if (data.created?.[0]) router.push(`/notes/${data.created[0].id}`);
+      } finally {
+        setImporting(false);
+      }
+    },
+    [mutate, router]
+  );
+
   useEffect(() => {
     if (!search.trim()) {
       setSearchResults([]);
@@ -95,14 +161,59 @@ export function Sidebar() {
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-3 border-b border-border">
           <span className="text-sm font-semibold text-foreground/80">Notes</span>
-          <button
-            onClick={() => createNote()}
-            className="text-xs px-2 py-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-            title="New page"
-          >
-            + New
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className="text-xs px-2 py-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              title="Import notes (Markdown, HTML, text) from Obsidian, Notion, Bear, …"
+            >
+              {importing ? "Importing…" : "Import"}
+            </button>
+            <button
+              onClick={async () => {
+                const res = await fetch("/api/daily");
+                const { id } = (await res.json()) as { id: string };
+                await mutate();
+                router.push(`/notes/${id}`);
+              }}
+              className="text-xs px-2 py-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              title="Open today's daily note"
+            >
+              Today
+            </button>
+            <button
+              onClick={() => createNote()}
+              className="text-xs px-2 py-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              title="New page (⌘K for command palette)"
+            >
+              + New
+            </button>
+            <TemplateMenu
+              onCreate={async (templateId) => {
+                const res = await fetch("/api/templates", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ templateId }),
+                });
+                const { id } = (await res.json()) as { id: string };
+                await mutate();
+                router.push(`/notes/${id}`);
+              }}
+            />
+          </div>
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept=".md,.markdown,.html,.htm,.txt,.text"
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files?.length) handleImport(e.target.files);
+            e.target.value = "";
+          }}
+        />
 
         {/* Search */}
         <div className="px-3 py-2 border-b border-border">
@@ -129,7 +240,9 @@ export function Sidebar() {
                   {r.snippet && (
                     <div
                       className="text-xs text-muted-foreground truncate mt-0.5"
-                      dangerouslySetInnerHTML={{ __html: r.snippet }}
+                      dangerouslySetInnerHTML={{
+                        __html: DOMPurify.sanitize(r.snippet, { ALLOWED_TAGS: ["mark"] }),
+                      }}
                     />
                   )}
                 </button>
@@ -149,6 +262,7 @@ export function Sidebar() {
               onNavigate={(id) => router.push(`/notes/${id}`)}
               onCreate={createNote}
               onDelete={deleteNote}
+              onReorder={handleReorder}
             />
           ))}
         </div>
@@ -186,6 +300,20 @@ export function Sidebar() {
                 <line x1="12" y1="14.5" x2="18" y2="17" />
               </svg>
             </button>
+            <button
+              onClick={() => router.push("/board")}
+              className={`text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-accent ${
+                pathname === "/board" ? "text-foreground bg-accent" : ""
+              }`}
+              title="Board (kanban)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="4" width="5" height="16" rx="1" />
+                <rect x="10" y="4" width="5" height="10" rx="1" />
+                <rect x="17" y="4" width="4" height="13" rx="1" />
+              </svg>
+            </button>
+            <VoiceQuickNote />
           </div>
           <ThemeToggle />
         </div>

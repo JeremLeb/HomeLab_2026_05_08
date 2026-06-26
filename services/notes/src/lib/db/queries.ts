@@ -6,6 +6,9 @@ export type Note = {
   title: string;
   content: string;
   keyPoints: string[];
+  tags: string[];
+  isTemplate: boolean;
+  status: string;
   parentId: string | null;
   position: number;
   createdAt: string;
@@ -31,6 +34,16 @@ export type Settings = {
   anthropicModel: string;
   linkThreshold: number;
   theme: string;
+  whisperUrl: string;
+};
+
+export type Recording = {
+  id: string;
+  noteId: string;
+  filename: string;
+  durationSeconds: number;
+  transcript: string;
+  createdAt: string;
 };
 
 function rowToNote(row: Record<string, unknown>): Note {
@@ -39,6 +52,9 @@ function rowToNote(row: Record<string, unknown>): Note {
     title: row.title as string,
     content: row.content as string,
     keyPoints: JSON.parse((row.key_points as string) || "[]"),
+    tags: JSON.parse((row.tags as string) || "[]"),
+    isTemplate: !!(row.is_template as number),
+    status: (row.status as string) || "",
     parentId: (row.parent_id as string | null) || null,
     position: row.position as number,
     createdAt: row.created_at as string,
@@ -57,6 +73,18 @@ function rowToSettings(row: Record<string, unknown>): Settings {
     anthropicModel: row.anthropic_model as string,
     linkThreshold: row.link_threshold as number,
     theme: row.theme as string,
+    whisperUrl: (row.whisper_url as string) || "",
+  };
+}
+
+function rowToRecording(row: Record<string, unknown>): Recording {
+  return {
+    id: row.id as string,
+    noteId: row.note_id as string,
+    filename: row.filename as string,
+    durationSeconds: row.duration_seconds as number,
+    transcript: row.transcript as string,
+    createdAt: row.created_at as string,
   };
 }
 
@@ -66,7 +94,7 @@ export function listNotes(): Note[] {
   const db = getDb();
   const rows = db
     .prepare(
-      "SELECT id, title, parent_id, position, created_at, updated_at FROM notes ORDER BY position ASC, created_at ASC"
+      "SELECT id, title, parent_id, position, tags, is_template, status, created_at, updated_at FROM notes ORDER BY position ASC, created_at ASC"
     )
     .all() as Record<string, unknown>[];
   return rows.map((r) => ({
@@ -82,9 +110,19 @@ export function getNoteById(id: string): Note | null {
   return row ? rowToNote(row) : null;
 }
 
+export function getNoteByTitle(title: string): Note | null {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT * FROM notes WHERE title = ? COLLATE NOCASE LIMIT 1")
+    .get(title) as Record<string, unknown> | null;
+  return row ? rowToNote(row) : null;
+}
+
 export function createNote(data: {
   title?: string;
   parentId?: string | null;
+  content?: string;
+  isTemplate?: boolean;
 }): Note {
   const db = getDb();
   const id = randomUUID();
@@ -97,8 +135,15 @@ export function createNote(data: {
   ).m;
 
   db.prepare(
-    `INSERT INTO notes (id, title, parent_id, position) VALUES (?, ?, ?, ?)`
-  ).run(id, data.title ?? "Untitled", data.parentId ?? null, maxPos + 1);
+    `INSERT INTO notes (id, title, parent_id, position, content, is_template) VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(
+    id,
+    data.title ?? "Untitled",
+    data.parentId ?? null,
+    maxPos + 1,
+    data.content ?? '{"type":"doc","content":[]}',
+    data.isTemplate ? 1 : 0
+  );
 
   return getNoteById(id)!;
 }
@@ -109,6 +154,9 @@ export function updateNote(
     title: string;
     content: string;
     keyPoints: string[];
+    tags: string[];
+    isTemplate: boolean;
+    status: string;
     parentId: string | null;
     position: number;
   }>
@@ -128,6 +176,18 @@ export function updateNote(
   if (data.keyPoints !== undefined) {
     fields.push("key_points = ?");
     values.push(JSON.stringify(data.keyPoints));
+  }
+  if (data.tags !== undefined) {
+    fields.push("tags = ?");
+    values.push(JSON.stringify(data.tags));
+  }
+  if (data.isTemplate !== undefined) {
+    fields.push("is_template = ?");
+    values.push(data.isTemplate ? 1 : 0);
+  }
+  if (data.status !== undefined) {
+    fields.push("status = ?");
+    values.push(data.status);
   }
   if (data.parentId !== undefined) {
     fields.push("parent_id = ?");
@@ -160,6 +220,35 @@ export function updateNote(
   }
 
   return getNoteById(id);
+}
+
+// Move a note under a new parent and place it at `index` among its siblings,
+// renumbering all siblings so positions stay contiguous. Guards against
+// dropping a note into one of its own descendants.
+export function reorderNote(id: string, newParentId: string | null, index: number): void {
+  const db = getDb();
+  // Prevent cycles: walk up from newParentId; if we hit `id`, abort.
+  let ancestor: string | null = newParentId;
+  while (ancestor) {
+    if (ancestor === id) return;
+    const row = db.prepare("SELECT parent_id FROM notes WHERE id = ?").get(ancestor) as
+      | { parent_id: string | null }
+      | undefined;
+    ancestor = row?.parent_id ?? null;
+  }
+
+  const tx = db.transaction(() => {
+    db.prepare("UPDATE notes SET parent_id = ? WHERE id = ?").run(newParentId, id);
+    const siblings = db
+      .prepare("SELECT id FROM notes WHERE parent_id IS ? ORDER BY position ASC, created_at ASC")
+      .all(newParentId) as { id: string }[];
+    const ordered = siblings.map((s) => s.id).filter((sid) => sid !== id);
+    const clamped = Math.max(0, Math.min(index, ordered.length));
+    ordered.splice(clamped, 0, id);
+    const upd = db.prepare("UPDATE notes SET position = ? WHERE id = ?");
+    ordered.forEach((sid, i) => upd.run(i, sid));
+  });
+  tx();
 }
 
 export function deleteNote(id: string): void {
@@ -264,6 +353,10 @@ export function updateSettings(data: Partial<Settings>): Settings {
     fields.push("theme = ?");
     values.push(data.theme);
   }
+  if (data.whisperUrl !== undefined) {
+    fields.push("whisper_url = ?");
+    values.push(data.whisperUrl);
+  }
 
   if (fields.length > 0) {
     db.prepare(`UPDATE settings SET ${fields.join(", ")} WHERE id = 1`).run(
@@ -343,4 +436,191 @@ export function getAllNotesKeyPoints(): {
     title: r.title,
     keyPoints: JSON.parse(r.key_points || "[]"),
   }));
+}
+
+// ── Recordings ───────────────────────────────────────────────────────────────
+
+export function createRecording(data: {
+  noteId: string;
+  filename: string;
+  durationSeconds: number;
+  transcript: string;
+}): Recording {
+  const db = getDb();
+  const id = randomUUID();
+  db.prepare(
+    `INSERT INTO recordings (id, note_id, filename, duration_seconds, transcript)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(id, data.noteId, data.filename, data.durationSeconds, data.transcript);
+  return db.prepare("SELECT * FROM recordings WHERE id = ?").get(id) as Recording;
+}
+
+export function listRecordingsForNote(noteId: string): Recording[] {
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT * FROM recordings WHERE note_id = ? ORDER BY created_at DESC")
+    .all(noteId) as Record<string, unknown>[];
+  return rows.map(rowToRecording);
+}
+
+export function getRecording(id: string): Recording | null {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT * FROM recordings WHERE id = ?")
+    .get(id) as Record<string, unknown> | null;
+  return row ? rowToRecording(row) : null;
+}
+
+// ── Attachments ──────────────────────────────────────────────────────────────
+
+export type Attachment = {
+  id: string;
+  noteId: string | null;
+  filename: string;
+  originalName: string;
+  mime: string;
+  size: number;
+  createdAt: string;
+};
+
+function rowToAttachment(row: Record<string, unknown>): Attachment {
+  return {
+    id: row.id as string,
+    noteId: (row.note_id as string | null) || null,
+    filename: row.filename as string,
+    originalName: row.original_name as string,
+    mime: row.mime as string,
+    size: row.size as number,
+    createdAt: row.created_at as string,
+  };
+}
+
+export function createAttachment(data: {
+  id: string;
+  noteId: string | null;
+  filename: string;
+  originalName: string;
+  mime: string;
+  size: number;
+}): Attachment {
+  const db = getDb();
+  db.prepare(
+    `INSERT INTO attachments (id, note_id, filename, original_name, mime, size)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(data.id, data.noteId, data.filename, data.originalName, data.mime, data.size);
+  return getAttachment(data.id)!;
+}
+
+export function getAttachment(id: string): Attachment | null {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT * FROM attachments WHERE id = ?")
+    .get(id) as Record<string, unknown> | null;
+  return row ? rowToAttachment(row) : null;
+}
+
+// ── Note versions ────────────────────────────────────────────────────────────
+
+export type NoteVersion = {
+  id: string;
+  noteId: string;
+  title: string;
+  content: string;
+  createdAt: string;
+};
+
+const MAX_VERSIONS = 50;
+
+export function createVersion(noteId: string, title: string, content: string): void {
+  const db = getDb();
+  // Skip if identical to the latest snapshot
+  const latest = db
+    .prepare("SELECT content FROM note_versions WHERE note_id = ? ORDER BY created_at DESC LIMIT 1")
+    .get(noteId) as { content: string } | undefined;
+  if (latest && latest.content === content) return;
+
+  db.prepare(
+    "INSERT INTO note_versions (id, note_id, title, content) VALUES (?, ?, ?, ?)"
+  ).run(randomUUID(), noteId, title, content);
+
+  // Cap retained versions
+  db.prepare(
+    `DELETE FROM note_versions WHERE note_id = ? AND id NOT IN (
+       SELECT id FROM note_versions WHERE note_id = ? ORDER BY created_at DESC LIMIT ?
+     )`
+  ).run(noteId, noteId, MAX_VERSIONS);
+}
+
+export function listVersions(noteId: string): Omit<NoteVersion, "content">[] {
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT id, note_id, title, created_at FROM note_versions WHERE note_id = ? ORDER BY created_at DESC")
+    .all(noteId) as Record<string, unknown>[];
+  return rows.map((r) => ({
+    id: r.id as string,
+    noteId: r.note_id as string,
+    title: r.title as string,
+    createdAt: r.created_at as string,
+  }));
+}
+
+export function getVersion(id: string): NoteVersion | null {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT * FROM note_versions WHERE id = ?")
+    .get(id) as Record<string, unknown> | null;
+  if (!row) return null;
+  return {
+    id: row.id as string,
+    noteId: row.note_id as string,
+    title: row.title as string,
+    content: row.content as string,
+    createdAt: row.created_at as string,
+  };
+}
+
+// ── Templates / status ───────────────────────────────────────────────────────
+
+export function listTemplates(): Note[] {
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT * FROM notes WHERE is_template = 1 ORDER BY title ASC")
+    .all() as Record<string, unknown>[];
+  return rows.map(rowToNote);
+}
+
+export function listByStatus(): { id: string; title: string; status: string }[] {
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT id, title, status FROM notes WHERE is_template = 0 ORDER BY position ASC")
+    .all() as { id: string; title: string; status: string }[];
+  return rows;
+}
+
+// ── Embeddings (RAG) ─────────────────────────────────────────────────────────
+
+export function upsertEmbedding(noteId: string, vector: number[], textHash: string): void {
+  const db = getDb();
+  db.prepare(
+    `INSERT INTO note_embeddings (note_id, vector, text_hash, updated_at)
+     VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(note_id) DO UPDATE SET vector = excluded.vector, text_hash = excluded.text_hash, updated_at = datetime('now')`
+  ).run(noteId, JSON.stringify(vector), textHash);
+}
+
+export function getEmbedding(noteId: string): { vector: number[]; textHash: string } | null {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT vector, text_hash FROM note_embeddings WHERE note_id = ?")
+    .get(noteId) as { vector: string; text_hash: string } | undefined;
+  if (!row) return null;
+  return { vector: JSON.parse(row.vector || "[]"), textHash: row.text_hash };
+}
+
+export function listEmbeddings(): { noteId: string; vector: number[] }[] {
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT note_id, vector FROM note_embeddings")
+    .all() as { note_id: string; vector: string }[];
+  return rows.map((r) => ({ noteId: r.note_id, vector: JSON.parse(r.vector || "[]") }));
 }

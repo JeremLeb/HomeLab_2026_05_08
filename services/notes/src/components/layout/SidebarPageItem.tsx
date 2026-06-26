@@ -4,6 +4,8 @@ import { useState, useRef } from "react";
 import type { NoteListItem } from "@/types";
 import { cn } from "@/lib/utils";
 
+type DropPos = "before" | "after" | "inside";
+
 type Props = {
   node: NoteListItem;
   depth: number;
@@ -11,6 +13,7 @@ type Props = {
   onNavigate: (id: string) => void;
   onCreate: (parentId: string) => void;
   onDelete: (id: string) => void;
+  onReorder: (dragId: string, targetId: string, pos: DropPos) => void;
 };
 
 export function SidebarPageItem({
@@ -20,13 +23,25 @@ export function SidebarPageItem({
   onNavigate,
   onCreate,
   onDelete,
+  onReorder,
 }: Props) {
   const [expanded, setExpanded] = useState(depth === 0);
   const [renaming, setRenaming] = useState(false);
   const [renameVal, setRenameVal] = useState(node.title);
+  const [dropPos, setDropPos] = useState<DropPos | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isActive = node.id === currentId;
   const hasChildren = (node.children?.length ?? 0) > 0;
+
+  // Compute whether the pointer is in the top third (before), bottom third
+  // (after), or middle (nest inside) of the row.
+  const computeDropPos = (e: React.DragEvent): DropPos => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - r.top;
+    if (y < r.height * 0.3) return "before";
+    if (y > r.height * 0.7) return "after";
+    return "inside";
+  };
 
   const handleRename = async () => {
     if (renameVal.trim() && renameVal !== node.title) {
@@ -42,13 +57,41 @@ export function SidebarPageItem({
   return (
     <div>
       <div
+        draggable={!renaming}
+        onDragStart={(e) => {
+          e.dataTransfer.setData("text/note-id", node.id);
+          e.dataTransfer.effectAllowed = "move";
+        }}
+        onDragOver={(e) => {
+          const dragId = e.dataTransfer.types.includes("text/note-id");
+          if (!dragId) return;
+          e.preventDefault();
+          setDropPos(computeDropPos(e));
+        }}
+        onDragLeave={() => setDropPos(null)}
+        onDrop={(e) => {
+          const dragId = e.dataTransfer.getData("text/note-id");
+          const pos = dropPos;
+          setDropPos(null);
+          if (!dragId || dragId === node.id || !pos) return;
+          e.preventDefault();
+          if (pos === "inside") setExpanded(true);
+          onReorder(dragId, node.id, pos);
+        }}
         className={cn(
-          "group flex items-center gap-1 rounded-md mx-1 my-0.5 text-sm cursor-pointer select-none",
+          "group flex items-center gap-1 rounded-md mx-1 my-0.5 text-sm cursor-pointer select-none relative",
           "hover:bg-accent/60 transition-colors",
-          isActive && "bg-accent text-accent-foreground"
+          isActive && "bg-accent text-accent-foreground",
+          dropPos === "inside" && "ring-1 ring-inset ring-[hsl(221_83%_53%)] bg-accent/40"
         )}
         style={{ paddingLeft: `${8 + depth * 16}px`, paddingRight: 4 }}
       >
+        {dropPos === "before" && (
+          <div className="absolute left-2 right-2 top-0 h-0.5 bg-[hsl(221_83%_53%)] rounded" />
+        )}
+        {dropPos === "after" && (
+          <div className="absolute left-2 right-2 bottom-0 h-0.5 bg-[hsl(221_83%_53%)] rounded" />
+        )}
         {/* Expand toggle */}
         <button
           className={cn(
@@ -141,6 +184,7 @@ export function SidebarPageItem({
               onNavigate={onNavigate}
               onCreate={onCreate}
               onDelete={onDelete}
+              onReorder={onReorder}
             />
           ))}
         </div>

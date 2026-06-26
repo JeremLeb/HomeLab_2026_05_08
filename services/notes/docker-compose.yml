@@ -6,9 +6,23 @@ services:
     ports:
       - "3010:3000"
     volumes:
-      - ./data:/app/data
+      - ./data:/app/data     # SQLite DB + data/recordings audio files persist here
     environment:
-      - DATABASE_URL=file:../data/notes.db
+      - DATABASE_URL=file:/app/data/notes.db
       - NODE_ENV=production
     env_file:
       - .env
+
+  # Optional: local Whisper transcription server for meeting recording.
+  # Uncomment to enable, then set the Whisper URL in Settings to
+  # http://whisper:9000 (or http://localhost:9001 from your browser/host).
+  # CPU works; add a GPU runtime + ASR_MODEL=small/medium for better quality.
+  # whisper:
+  #   image: onerahmet/openai-whisper-asr-webservice:latest
+  #   container_name: homelab-whisper
+  #   restart: unless-stopped
+  #   ports:
+  #     - "9001:9000"
+  #   environment:
+  #     - ASR_MODEL=base
+  #     - ASR_ENGINE=openai_whisper

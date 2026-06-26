@@ -9,4 +9,7 @@ export interface AiAdapter {
     messages: AiMessage[],
     onChunk: (delta: string) => void
   ): Promise<void>;
+  // Optional: embed text into a vector for semantic search (RAG).
+  // Not all providers support embeddings (e.g. Anthropic).
+  embed?(text: string): Promise<number[]>;
 }

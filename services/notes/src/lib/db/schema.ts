@@ -68,5 +68,65 @@ function initSchema(db: Database.Database) {
     );
 
     INSERT INTO settings(id) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM settings WHERE id = 1);
+
+    CREATE TABLE IF NOT EXISTS recordings (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+      filename TEXT NOT NULL,
+      duration_seconds REAL NOT NULL DEFAULT 0,
+      transcript TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_recordings_note ON recordings(note_id);
+
+    CREATE TABLE IF NOT EXISTS attachments (
+      id TEXT PRIMARY KEY,
+      note_id TEXT REFERENCES notes(id) ON DELETE SET NULL,
+      filename TEXT NOT NULL,
+      original_name TEXT NOT NULL DEFAULT '',
+      mime TEXT NOT NULL DEFAULT 'application/octet-stream',
+      size INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_attachments_note ON attachments(note_id);
+
+    CREATE TABLE IF NOT EXISTS note_versions (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+      title TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_note_versions_note ON note_versions(note_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS note_embeddings (
+      note_id TEXT PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,
+      vector TEXT NOT NULL DEFAULT '[]',
+      text_hash TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
+
+  // Guarded migrations for note columns added after initial deploy
+  const noteCols = db.prepare("PRAGMA table_info(notes)").all() as { name: string }[];
+  const noteColNames = noteCols.map((c) => c.name);
+  if (!noteColNames.includes("tags")) {
+    db.exec("ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'");
+  }
+  if (!noteColNames.includes("is_template")) {
+    db.exec("ALTER TABLE notes ADD COLUMN is_template INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!noteColNames.includes("status")) {
+    db.exec("ALTER TABLE notes ADD COLUMN status TEXT NOT NULL DEFAULT ''");
+  }
+
+  // Guarded migrations for columns added after initial deploy
+  const settingsCols = db.prepare("PRAGMA table_info(settings)").all() as { name: string }[];
+  const settingsColNames = settingsCols.map((c) => c.name);
+  if (!settingsColNames.includes("whisper_url")) {
+    db.exec("ALTER TABLE settings ADD COLUMN whisper_url TEXT NOT NULL DEFAULT ''");
+  }
 }
