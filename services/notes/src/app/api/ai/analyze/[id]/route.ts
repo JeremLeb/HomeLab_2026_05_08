@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAiAdapter, jaccardSimilarity, getIntersection } from "@/lib/ai";
+import { getAiAdapter, jaccardSimilarity, getIntersection, cleanConcepts } from "@/lib/ai";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rateLimit";
 import {
   getNoteById,
@@ -32,10 +32,15 @@ export async function POST(req: Request, { params }: Params) {
     .replace(/[{}"\\[\]]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 3000);
+    .slice(0, 6000);
 
-  if (plainText.length < 30)
-    return NextResponse.json({ keyPoints: note.keyPoints });
+  // Require real substance before we extract concepts or link. A near-empty
+  // note must never accumulate key points that could match other notes.
+  if (plainText.replace(/\s+/g, "").length < 80) {
+    updateNote(id, { keyPoints: [] });
+    deleteNoteLinksFrom(id);
+    return NextResponse.json({ keyPoints: [] });
+  }
 
   try {
     const needsTitle = !note.title || note.title === "Untitled";
@@ -63,7 +68,7 @@ ${plainText}
           tags?: string[];
           title?: string;
         };
-        keyPoints = (parsed.keyConcepts ?? []).filter((k) => typeof k === "string").slice(0, 10);
+        keyPoints = cleanConcepts(parsed.keyConcepts ?? []).slice(0, 10);
         tags = (parsed.tags ?? [])
           .filter((t) => typeof t === "string")
           .map((t) => t.toLowerCase().trim().replace(/\s+/g, "-"))
@@ -78,7 +83,7 @@ ${plainText}
       const arrMatch = response.match(/\[[\s\S]*?\]/);
       if (arrMatch) {
         try {
-          keyPoints = (JSON.parse(arrMatch[0]) as string[]).filter((k) => typeof k === "string").slice(0, 10);
+          keyPoints = cleanConcepts(JSON.parse(arrMatch[0]) as string[]).slice(0, 10);
         } catch {
           /* ignore */
         }
@@ -93,14 +98,16 @@ ${plainText}
       // Auto-link: compute similarity vs all other notes.
       // Stricter rules to avoid spurious links (e.g. a near-empty note sharing
       // one or two generic concepts with a full note):
-      //   - both notes must have at least MIN_KEYPOINTS concepts
-      //   - they must share at least MIN_SHARED concepts
-      //   - Jaccard score must clear the configured threshold
-      const MIN_KEYPOINTS = 3;
+      //   - both notes must have at least MIN_KEYPOINTS *clean* concepts
+      //   - they must share at least MIN_SHARED meaningful concepts
+      //   - Jaccard score must clear the configured threshold (floored)
+      // Concepts are already cleaned (blanks/stopwords removed) so an empty or
+      // trivial note can no longer produce a match.
+      const MIN_KEYPOINTS = 4;
       const MIN_SHARED = 2;
 
       const settings = getSettings();
-      const threshold = settings.linkThreshold;
+      const threshold = Math.max(settings.linkThreshold, 0.25);
       const allNotes = getAllNotesKeyPoints().filter((n) => n.id !== id);
 
       deleteNoteLinksFrom(id);
@@ -108,12 +115,13 @@ ${plainText}
       // Skip linking entirely for sparse notes — they produce noisy matches.
       if (keyPoints.length >= MIN_KEYPOINTS) {
         for (const other of allNotes) {
-          if (other.keyPoints.length < MIN_KEYPOINTS) continue;
+          const otherClean = cleanConcepts(other.keyPoints);
+          if (otherClean.length < MIN_KEYPOINTS) continue;
 
-          const matched = getIntersection(keyPoints, other.keyPoints);
+          const matched = getIntersection(keyPoints, otherClean);
           if (matched.length < MIN_SHARED) continue;
 
-          const score = jaccardSimilarity(keyPoints, other.keyPoints);
+          const score = jaccardSimilarity(keyPoints, otherClean);
           if (score < threshold) continue;
 
           upsertNoteLink({

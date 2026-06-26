@@ -10,22 +10,54 @@ type Node = Record<string, unknown>;
 // ── Inline parsing ──────────────────────────────────────────────────────────
 // Handles **bold**, *italic* / _italic_, `code`, and [text](url) links.
 
-function decodeEntities(s: string): string {
+export function decodeEntities(s: string): string {
   return s
     .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#0*39;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–")
+    .replace(/&hellip;/g, "…")
+    // Numeric entities (hex and decimal), e.g. &#x27; (apostrophe), &#96; (`)
+    .replace(/&#x([0-9a-fA-F]+);/g, (_m, h) => safeFromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_m, d) => safeFromCodePoint(parseInt(d, 10)))
+    // &amp; last so we don't double-decode the entities above
+    .replace(/&amp;/g, "&");
+}
+
+function safeFromCodePoint(cp: number): string {
+  if (!Number.isFinite(cp) || cp < 0 || cp > 0x10ffff) return "";
+  try {
+    return String.fromCodePoint(cp);
+  } catch {
+    return "";
+  }
+}
+
+// Extract the text of a <pre> block while PRESERVING line breaks (code must not
+// be collapsed onto one line). Strips inner tags, converts <br>, decodes entities.
+function preText(html: string): string {
+  return decodeEntities(
+    html
+      .replace(/<\/?code[^>]*>/gi, "")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+  )
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]+$/gm, "")
+    .replace(/^\n+|\n+$/g, "");
 }
 
 function inlineToNodes(raw: string): Node[] {
   const text = decodeEntities(raw);
   const nodes: Node[] = [];
-  // Token regex: links, bold, italic (* or _), inline code
+  // Token regex: [[wiki links]], markdown links, bold, italic (* or _), inline code.
+  // [[...]] is matched first so it isn't mistaken for a markdown link.
   const re =
-    /(\[([^\]]+)\]\(([^)]+)\))|(\*\*([^*]+)\*\*)|(__([^_]+)__)|(\*([^*]+)\*)|(_([^_]+)_)|(`([^`]+)`)/g;
+    /(\[\[([^\]]+)\]\])|(\[([^\]]+)\]\(([^)]+)\))|(\*\*([^*]+)\*\*)|(__([^_]+)__)|(\*([^*]+)\*)|(_([^_]+)_)|(`([^`]+)`)/g;
   let last = 0;
   let m: RegExpExecArray | null;
   const push = (t: string, marks?: Node[]) => {
@@ -35,13 +67,17 @@ function inlineToNodes(raw: string): Node[] {
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) push(text.slice(last, m.index));
     if (m[1]) {
-      push(m[2], [{ type: "link", attrs: { href: m[3] } }]);
-    } else if (m[4] || m[6]) {
-      push(m[5] || m[7], [{ type: "bold" }]);
-    } else if (m[8] || m[10]) {
-      push(m[9] || m[11], [{ type: "italic" }]);
-    } else if (m[12]) {
-      push(m[13], [{ type: "code" }]);
+      // [[Wiki Link]] → wikiLink mark so it renders clickable in the editor
+      const title = m[2].trim();
+      push(title, [{ type: "wikiLink", attrs: { title } }]);
+    } else if (m[3]) {
+      push(m[4], [{ type: "link", attrs: { href: m[5] } }]);
+    } else if (m[6] || m[8]) {
+      push(m[7] || m[9], [{ type: "bold" }]);
+    } else if (m[10] || m[12]) {
+      push(m[11] || m[13], [{ type: "italic" }]);
+    } else if (m[14]) {
+      push(m[15], [{ type: "code" }]);
     }
     last = re.lastIndex;
   }
@@ -178,10 +214,26 @@ export function markdownToTiptap(md: string): Node {
 
 export function htmlToMarkdown(html: string): string {
   let s = html;
-  // Drop scripts/styles/head noise
+  // Drop comments, non-content elements, and void metadata tags entirely
   s = s.replace(/<!--[\s\S]*?-->/g, "");
-  s = s.replace(/<(script|style|head|title)[\s\S]*?<\/\1>/gi, "");
-  s = s.replace(/<\/?(html|body|main|article|section|div|span|figure)[^>]*>/gi, "\n");
+  s = s.replace(/<(script|style|head|title|noscript|template|svg)[\s\S]*?<\/\1>/gi, "");
+  // (keep <input> — list-item checkbox detection below relies on it)
+  s = s.replace(/<(link|meta|base|img|source|track)[^>]*\/?>/gi, "");
+
+  // Code blocks FIRST, before any whitespace-collapsing runs, so multi-line
+  // code keeps its line breaks. Detect a language from <code class="language-x">.
+  s = s.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, (_x, t) => {
+    const langMatch = t.match(/<code[^>]*class=["'][^"']*language-([a-z0-9+#-]+)/i);
+    const lang = langMatch ? langMatch[1] : "";
+    return `\n\n\`\`\`${lang}\n${preText(t)}\n\`\`\`\n\n`;
+  });
+
+  // Block wrappers → line breaks; inline <span> is removed without one.
+  s = s.replace(
+    /<\/?(html|body|main|article|section|div|figure|figcaption|header|footer|nav|aside)[^>]*>/gi,
+    "\n"
+  );
+  s = s.replace(/<\/?span[^>]*>/gi, "");
 
   // Headings
   for (let l = 1; l <= 6; l++) {
@@ -189,7 +241,6 @@ export function htmlToMarkdown(html: string): string {
   }
   // Block elements
   s = s.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (_x, t) => `\n\n> ${strip(t)}\n\n`);
-  s = s.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, (_x, t) => `\n\n\`\`\`\n${strip(t)}\n\`\`\`\n\n`);
   // List items: checkbox-aware
   s = s.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_x, t) => {
     const checkbox = /<input[^>]*type=["']?checkbox["']?[^>]*>/i.test(t);
