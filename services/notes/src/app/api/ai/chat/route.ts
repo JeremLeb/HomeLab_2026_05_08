@@ -30,8 +30,8 @@ export async function POST(req: Request) {
           .replace(/[{}"\\[\]]/g, " ")
           .replace(/\s+/g, " ")
           .trim()
-          .slice(0, 4000);
-        systemPrompt = `You are a helpful assistant. The user is viewing a note titled "${note.title}". Here is its content:\n\n${plainText}\n\nAnswer questions about this note or help the user think through ideas.`;
+          .slice(0, 8000);
+        systemPrompt = `You are a helpful assistant. The user is viewing a note titled "${note.title}". Here is its content:\n\n${plainText}\n\nAnswer questions about this note or help the user think through ideas. Give detailed, substantive answers rather than terse ones.`;
       }
     }
 

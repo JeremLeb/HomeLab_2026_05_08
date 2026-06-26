@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import DOMPurify from "dompurify";
 import type { AiMessage } from "@/lib/ai/types";
 
 // Sanitize AI-generated HTML before rendering to prevent XSS.
 // Allow the same tags the AI is instructed to produce.
 const ALLOWED_TAGS = ["h1","h2","h3","p","ul","ol","li","strong","em","code","pre","blockquote","br","span","a"];
-const ALLOWED_ATTR = ["href","target","rel","class"];
+const ALLOWED_ATTR = ["href","target","rel","class","data-wiki-link"];
 function sanitize(html: string): string {
   return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR, FORCE_BODY: true });
 }
@@ -19,7 +20,7 @@ type Props = {
   onApplyHtml: (html: string) => void;
 };
 
-type Mode = "ask" | "edit";
+type Mode = "ask" | "edit" | "create";
 
 const QUICK_EDITS = [
   { label: "Improve writing", instruction: "Improve the writing: clearer, better flow, fix awkward phrasing. Keep the meaning and structure." },
@@ -31,7 +32,13 @@ const QUICK_EDITS = [
 ];
 
 export function AiPanel({ noteId, onClose, onApplyHtml }: Props) {
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>("ask");
+
+  // ── Create (author a new note) state ──
+  const [createPrompt, setCreatePrompt] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   // ── Ask (chat) state ──
   const [messages, setMessages] = useState<AiMessage[]>([]);
@@ -155,6 +162,35 @@ export function AiPanel({ noteId, onClose, onApplyHtml }: Props) {
     [noteId, editing]
   );
 
+  const runCreate = useCallback(async () => {
+    const p = createPrompt.trim();
+    if (!p || creating) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const res = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: p }),
+      });
+      const data = (await res.json()) as { id?: string; error?: string };
+      if (!res.ok || !data.id) {
+        setCreateError(
+          data.error === "No AI configured"
+            ? "No AI provider configured. Open Settings to connect one."
+            : data.error || "Could not create a note."
+        );
+        return;
+      }
+      setCreatePrompt("");
+      router.push(`/notes/${data.id}`);
+    } catch {
+      setCreateError("Connection error.");
+    } finally {
+      setCreating(false);
+    }
+  }, [createPrompt, creating, router]);
+
   return (
     <div className="flex flex-col border-l border-border bg-background" style={{ width: 380 }}>
       {/* Header */}
@@ -187,6 +223,14 @@ export function AiPanel({ noteId, onClose, onApplyHtml }: Props) {
           }`}
         >
           Edit note
+        </button>
+        <button
+          onClick={() => setMode("create")}
+          className={`flex-1 py-2 transition-colors ${
+            mode === "create" ? "text-foreground border-b-2 border-primary -mb-px" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Create
         </button>
       </div>
 
@@ -240,7 +284,7 @@ export function AiPanel({ noteId, onClose, onApplyHtml }: Props) {
             </div>
           </div>
         </>
-      ) : (
+      ) : mode === "edit" ? (
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           <p className="text-xs text-muted-foreground">
             Tell the AI how to change this note. It will draft a revision you can review and apply.
@@ -319,6 +363,38 @@ export function AiPanel({ noteId, onClose, onApplyHtml }: Props) {
               </div>
             </div>
           )}
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Describe a note for the AI to write from scratch. It will create a new
+            note with structure and <span className="font-medium">[[wiki links]]</span> to
+            related topics, then open it.
+          </p>
+
+          <textarea
+            value={createPrompt}
+            onChange={(e) => setCreatePrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                runCreate();
+              }
+            }}
+            placeholder="e.g. A primer on transformer architectures, with sections on attention, training, and links to related concepts…"
+            rows={5}
+            className="w-full text-sm bg-muted/50 border border-border rounded-md px-3 py-2 outline-none focus:ring-1 focus:ring-ring resize-none placeholder:text-muted-foreground"
+          />
+
+          <button
+            onClick={runCreate}
+            disabled={creating || !createPrompt.trim()}
+            className="w-full px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium disabled:opacity-50 hover:opacity-90 transition-opacity"
+          >
+            {creating ? "Creating note…" : "Create note (⌘↵)"}
+          </button>
+
+          {createError && <p className="text-sm text-red-400">{createError}</p>}
         </div>
       )}
     </div>
